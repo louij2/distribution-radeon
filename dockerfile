@@ -8,7 +8,7 @@ ENV TERM=xterm-256color
 
 # Install necessary packages
 RUN pacman -Syu --noconfirm && \
-    pacman -S --noconfirm base-devel git archiso sudo curl
+    pacman -S --noconfirm base-devel git archiso sudo curl gnupg
 
 # Add the SteamFork repository to pacman.conf
 RUN echo "[steamfork]" >> /etc/pacman.conf && \
@@ -23,14 +23,15 @@ Server = https://www1.ny.steamfork.org/repos/rel
 Server = https://www.steamfork.org/repos/rel
 EOF
 
-# Sync pacman and install the SteamFork keyring
-RUN pacman -Syy --noconfirm && \
-    pacman -S steamfork-keyring --noconfirm
-
-# Manually trust the SteamFork key
+# 🔹 Manually import and trust the SteamFork key before installing the keyring
 RUN pacman-key --init && \
     pacman-key --populate archlinux && \
+    pacman-key --recv-key A33991EE2981A3B05368EF5E75C1E5647441B94C --keyserver keyserver.ubuntu.com && \
     pacman-key --lsign-key A33991EE2981A3B05368EF5E75C1E5647441B94C
+
+# 🔹 Now install the SteamFork keyring without errors
+RUN pacman -Syy --noconfirm && \
+    pacman -S steamfork-keyring --noconfirm
 
 # Install additional SteamFork packages (if needed)
 RUN pacman -S --noconfirm steamfork-installer steamfork-customizations steamfork-device-support
