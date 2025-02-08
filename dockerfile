@@ -35,6 +35,15 @@ RUN pacman-key --init && \
 # Install additional SteamFork packages (if needed)
 RUN pacman -S --noconfirm steamfork-installer steamfork-customizations steamfork-device-support
 
+# 🔹 Install HoloISO keyring to fix missing `holo.gpg` issue
+RUN pacman -S --noconfirm holo-keyring || \
+    (echo "Manually adding Holo key" && \
+    pacman-key --recv-key 7A5BCE1D827B10E3 --keyserver keyserver.ubuntu.com && \
+    pacman-key --lsign-key 7A5BCE1D827B10E3)
+
+# 🔹 Ensure `holo.gpg` exists to prevent build errors
+RUN touch /usr/share/pacman/keyrings/holo.gpg && chmod 644 /usr/share/pacman/keyrings/holo.gpg
+
 # Create build directories (where the Makefile expects them)
 RUN mkdir -p /rootfs/installer /rootfs/steamfork /scripts /_work /release/images /release/repos
 
