@@ -10,9 +10,33 @@ ENV TERM=xterm-256color
 RUN pacman -Syu --noconfirm && \
     pacman -S --noconfirm base-devel git archiso sudo curl gnupg
 
-# Add the SteamFork repository to pacman.conf
+# Add SteamFork and SteamOS repositories to pacman.conf
 RUN echo "[steamfork]" >> /etc/pacman.conf && \
-    echo "Include = /etc/pacman.d/steamfork-mirrorlist" >> /etc/pacman.conf
+    echo "Include = /etc/pacman.d/steamfork-mirrorlist" >> /etc/pacman.conf && \
+    echo "[holoiso-next]" >> /etc/pacman.conf && \
+    echo "Server = https://cd2.holoiso.ru.eu.org/pkg/\$repo/os/\$arch" >> /etc/pacman.conf && \
+    echo "SigLevel = Never" >> /etc/pacman.conf && \
+    echo "[holostaging]" >> /etc/pacman.conf && \
+    echo "Server = https://cd2.holoiso.ru.eu.org/pkg/\$repo/os/\$arch" >> /etc/pacman.conf && \
+    echo "SigLevel = Never" >> /etc/pacman.conf && \
+    echo "[jupiter-main]" >> /etc/pacman.conf && \
+    echo "Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch" >> /etc/pacman.conf && \
+    echo "SigLevel = Never" >> /etc/pacman.conf && \
+    echo "[holo-main]" >> /etc/pacman.conf && \
+    echo "Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch" >> /etc/pacman.conf && \
+    echo "SigLevel = Never" >> /etc/pacman.conf && \
+    echo "[core-main]" >> /etc/pacman.conf && \
+    echo "Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch" >> /etc/pacman.conf && \
+    echo "SigLevel = Never" >> /etc/pacman.conf && \
+    echo "[extra-main]" >> /etc/pacman.conf && \
+    echo "Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch" >> /etc/pacman.conf && \
+    echo "SigLevel = Never" >> /etc/pacman.conf && \
+    echo "[community-main]" >> /etc/pacman.conf && \
+    echo "Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch" >> /etc/pacman.conf && \
+    echo "SigLevel = Never" >> /etc/pacman.conf && \
+    echo "[multilib-main]" >> /etc/pacman.conf && \
+    echo "Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch" >> /etc/pacman.conf && \
+    echo "SigLevel = Never" >> /etc/pacman.conf
 
 # Add the SteamFork mirror list
 RUN cat <<EOF > /etc/pacman.d/steamfork-mirrorlist
@@ -29,21 +53,14 @@ RUN pacman-key --init && \
     pacman-key --recv-key A33991EE2981A3B05368EF5E75C1E5647441B94C --keyserver keyserver.ubuntu.com && \
     pacman-key --lsign-key A33991EE2981A3B05368EF5E75C1E5647441B94C
 
-# 🔹 Now install the SteamFork keyring without errors
+# 🔹 Install SteamFork keyring and packages
 RUN pacman -Syy --noconfirm && \
-    pacman -S steamfork-keyring --noconfirm
+    pacman -S steamfork-keyring --noconfirm && \
+    pacman -S --noconfirm steamfork-installer steamfork-customizations steamfork-device-support
 
-# Install additional SteamFork packages (if needed)
-RUN pacman -S --noconfirm steamfork-installer steamfork-customizations steamfork-device-support
-
-# 🔹 Install HoloISO keyring to fix missing `holo.gpg` issue
-RUN pacman -S --noconfirm holo-keyring || \
-    (echo "Manually adding Holo key" && \
-    pacman-key --recv-key 7A5BCE1D827B10E3 --keyserver keyserver.ubuntu.com && \
-    pacman-key --lsign-key 7A5BCE1D827B10E3)
-
-# 🔹 Ensure `holo.gpg` exists to prevent build errors
-RUN touch /usr/share/pacman/keyrings/holo.gpg && chmod 644 /usr/share/pacman/keyrings/holo.gpg
+# 🔹 Install HoloISO dependencies (fix missing keyring issue)
+RUN pacman -S --noconfirm holoiso-main jupiter-main core-main extra-main community-main multilib-main || \
+    echo "Skipping optional HoloISO dependencies."
 
 # Create build directories (where the Makefile expects them)
 RUN mkdir -p /rootfs/installer /rootfs/steamfork /scripts /_work /release/images /release/repos
