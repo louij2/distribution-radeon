@@ -52,6 +52,12 @@ if ! grep -q "\[steamfork\]" "$PACMAN_CONF"; then
     echo -e "\n[steamfork]\nInclude = /etc/pacman.d/steamfork-mirrorlist" >> "$PACMAN_CONF"
 fi
 
+# Import SteamFork PGP keys and trust them
+echo "Importing SteamFork PGP keys..."
+sudo pacman-key --recv-keys A33991EE2981A3B05368EF5E75C1E5647441B94C
+sudo pacman-key --lsign-key A33991EE2981A3B05368EF5E75C1E5647441B94C
+sudo pacman-key --populate
+
 # Sync pacman databases again to include SteamFork repo
 echo "Updating pacman after adding SteamFork repo..."
 pacman -Sy --noconfirm
