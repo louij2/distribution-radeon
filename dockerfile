@@ -57,11 +57,14 @@ RUN pacman -Syy --noconfirm && \
     pacman -S steamfork-keyring --noconfirm && \
     pacman -S --noconfirm steamfork-installer steamfork-customizations steamfork-device-support
 
-# 🔹 Manually install `aurutils` from AUR (since it is not in pacman)
-RUN git clone https://aur.archlinux.org/aurutils.git /tmp/aurutils && \
-    cd /tmp/aurutils && \
-    makepkg -si --noconfirm && \
-    rm -rf /tmp/aurutils
+# 🔹 Create a non-root user (`builder`) for building AUR packages
+RUN useradd -m -G wheel builder && \
+    echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
+
+# 🔹 Manually install `aurutils` from AUR using `builder` user
+RUN su builder -c "git clone https://aur.archlinux.org/aurutils.git /home/builder/aurutils && \
+    cd /home/builder/aurutils && \
+    makepkg -si --noconfirm"
 
 # 🔹 Install all required packages from Makefile
 RUN pacman -S --noconfirm \
@@ -72,7 +75,7 @@ RUN pacman -S --noconfirm \
     webrtc-audio-processing inputplumber ryzenadj pikaur grafana-alloy
 
 # 🔹 Install AUR packages using aurutils
-RUN aur sync -c -n --noview wlr-randr dnsmasq-git libglibutil libgbinder python-gbinder waydroid xone-dongle-firmware xone-dkms
+RUN su builder -c "aur sync -c -n --noview wlr-randr dnsmasq-git libglibutil libgbinder python-gbinder waydroid xone-dongle-firmware xone-dkms"
 
 # Create build directories (where the Makefile expects them)
 RUN mkdir -p /rootfs/installer /rootfs/steamfork /scripts /_work /release/images /release/repos
