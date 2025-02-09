@@ -13,7 +13,7 @@ RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
 
 # Install necessary packages
 RUN pacman -Syu --noconfirm && \
-    pacman -S --noconfirm base-devel git archiso sudo curl gnupg
+    pacman -S --noconfirm base-devel git archiso sudo curl gnupg fakeroot
 
 # Add SteamFork and SteamOS repositories to pacman.conf (EXCLUDING broken HoloISO repos)
 RUN echo "[steamfork]" >> /etc/pacman.conf && \
@@ -57,8 +57,11 @@ RUN pacman -Syy --noconfirm && \
     pacman -S steamfork-keyring --noconfirm && \
     pacman -S --noconfirm steamfork-installer steamfork-customizations steamfork-device-support
 
-# 🔹 Install Arch Build System for AUR package handling
-RUN pacman -S --noconfirm aurutils
+# 🔹 Manually install `aurutils` from AUR (since it is not in pacman)
+RUN git clone https://aur.archlinux.org/aurutils.git /tmp/aurutils && \
+    cd /tmp/aurutils && \
+    makepkg -si --noconfirm && \
+    rm -rf /tmp/aurutils
 
 # 🔹 Install all required packages from Makefile
 RUN pacman -S --noconfirm \
