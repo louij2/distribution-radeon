@@ -9,6 +9,10 @@ REPO_DIR="/mnt/repositories/distribution-radeon"
 PACMAN_CONF="/etc/pacman.conf"
 STEAMFORK_MIRRORLIST="/etc/pacman.d/steamfork-mirrorlist"
 
+# Ensure expect is installed for automating gpg trust input
+echo "Installing expect package..."
+pacman -Sy --noconfirm expect
+
 # Manually update mirrorlist to avoid slow mirrors
 echo "Updating pacman mirrors..."
 cat > /etc/pacman.d/mirrorlist <<EOF
@@ -94,8 +98,16 @@ pacman-key --populate archlinux
 # Import and trust the SteamFork PGP key
 echo "Importing SteamFork PGP key..."
 pacman-key --recv-keys A33991EE2981A3B05368EF5E75C1E5647441B94C
+
 echo "Trusting SteamFork PGP key..."
-echo "5" | pacman-key --edit-key A33991EE2981A3B05368EF5E75C1E5647441B94C trust
+expect <<EOF
+spawn pacman-key --edit-key A33991EE2981A3B05368EF5E75C1E5647441B94C trust
+expect "Your decision?"
+send "5\r"
+expect eof
+EOF
+
+# Locally sign the key to allow package installations
 pacman-key --lsign-key A33991EE2981A3B05368EF5E75C1E5647441B94C
 
 # Sync pacman databases again to include all new repositories
