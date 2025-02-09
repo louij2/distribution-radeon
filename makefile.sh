@@ -9,15 +9,24 @@ REPO_DIR="/mnt/repositories/distribution-radeon"
 PACMAN_CONF="/etc/pacman.conf"
 STEAMFORK_MIRRORLIST="/etc/pacman.d/steamfork-mirrorlist"
 
+# Refresh Arch mirrors with fastest available
+echo "Refreshing mirror list..."
+reflector --latest 20 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
+
 # Ensure system is up to date
 echo "Updating system..."
+pacman -Syyu --noconfirm
 pacman -Sy --noconfirm pacman-mirrorlist reflector base-devel git sudo fakeroot archiso
+
+# Ensure repository directory exists
+mkdir -p "$REPO_DIR"
 
 # Clone the repository if it doesn't exist
 if [ ! -d "$REPO_DIR/.git" ]; then
     git clone "$REPO_URL" "$REPO_DIR"
 else
     cd "$REPO_DIR"
+    git config --global --add safe.directory "$REPO_DIR"  # Fix "dubious ownership" error
     git pull
 fi
 
@@ -31,11 +40,9 @@ Server = https://www1.ny.steamfork.org/repos/rel
 Server = https://www.steamfork.org/repos/rel
 EOF
 
-cat >> "$PACMAN_CONF" <<EOF
-
-[steamfork]
-Include = /etc/pacman.d/steamfork-mirrorlist
-EOF
+if ! grep -q "\[steamfork\]" "$PACMAN_CONF"; then
+    echo -e "\n[steamfork]\nInclude = /etc/pacman.d/steamfork-mirrorlist" >> "$PACMAN_CONF"
+fi
 
 # Sync package databases
 echo "Updating pacman..."
