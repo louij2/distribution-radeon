@@ -6,19 +6,18 @@ ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 ENV TERM=xterm-256color
 
+# Fix missing locale issue
+RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
+    locale-gen && \
+    echo "LANG=en_US.UTF-8" > /etc/locale.conf
+
 # Install necessary packages
 RUN pacman -Syu --noconfirm && \
     pacman -S --noconfirm base-devel git archiso sudo curl gnupg
 
-# Add SteamFork and SteamOS repositories to pacman.conf
+# Add SteamFork and SteamOS repositories to pacman.conf (EXCLUDING broken HoloISO repos)
 RUN echo "[steamfork]" >> /etc/pacman.conf && \
     echo "Include = /etc/pacman.d/steamfork-mirrorlist" >> /etc/pacman.conf && \
-    echo "[holoiso-next]" >> /etc/pacman.conf && \
-    echo "Server = https://cd2.holoiso.ru.eu.org/pkg/\$repo/os/\$arch" >> /etc/pacman.conf && \
-    echo "SigLevel = Never" >> /etc/pacman.conf && \
-    echo "[holostaging]" >> /etc/pacman.conf && \
-    echo "Server = https://cd2.holoiso.ru.eu.org/pkg/\$repo/os/\$arch" >> /etc/pacman.conf && \
-    echo "SigLevel = Never" >> /etc/pacman.conf && \
     echo "[jupiter-main]" >> /etc/pacman.conf && \
     echo "Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch" >> /etc/pacman.conf && \
     echo "SigLevel = Never" >> /etc/pacman.conf && \
@@ -58,9 +57,19 @@ RUN pacman -Syy --noconfirm && \
     pacman -S steamfork-keyring --noconfirm && \
     pacman -S --noconfirm steamfork-installer steamfork-customizations steamfork-device-support
 
-# 🔹 Install HoloISO dependencies (fix missing keyring issue)
-RUN pacman -S --noconfirm holoiso-main jupiter-main core-main extra-main community-main multilib-main || \
-    echo "Skipping optional HoloISO dependencies."
+# 🔹 Install Arch Build System for AUR package handling
+RUN pacman -S --noconfirm aurutils
+
+# 🔹 Install all required packages from Makefile
+RUN pacman -S --noconfirm \
+    linux-firmware linux python-strictyaml python-sphinx-hawkmoth \
+    libdrm lib32-libdrm libglvnd lib32-libglvnd wayland lib32-wayland wayland-protocols \
+    xorg-xwayland mesa mesa-radv lib32-mesa lib32-mesa-radv gamescope gamescope-legacy \
+    ectool steam-powerbuttond steamfork-customizations steamfork-device-support steamfork-installer \
+    webrtc-audio-processing inputplumber ryzenadj pikaur grafana-alloy
+
+# 🔹 Install AUR packages using aurutils
+RUN aur sync -c -n --noview wlr-randr dnsmasq-git libglibutil libgbinder python-gbinder waydroid xone-dongle-firmware xone-dkms
 
 # Create build directories (where the Makefile expects them)
 RUN mkdir -p /rootfs/installer /rootfs/steamfork /scripts /_work /release/images /release/repos
