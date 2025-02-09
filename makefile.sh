@@ -18,7 +18,7 @@ mkdir -p "$CONTAINER_STORAGE" "$CONTAINER_OUTPUT" "$REPO_DIR" "$PACMAN_CONF_DIR"
 # Ensure git is installed before cloning
 if ! command -v git &>/dev/null; then
     echo "Git is not installed. Installing now..."
-    sudo pacman -Sy --noconfirm git
+    pacman -Sy --noconfirm git
 fi
 
 # Clone the repo if it doesn't exist
@@ -73,7 +73,7 @@ docker run --rm -it --privileged \
   
   set -e
   echo 'Updating package database...'
-  pacman -Sy --noconfirm git base-devel sudo fakeroot archiso
+  pacman -Sy --noconfirm git base-devel fakeroot archiso
 
   echo 'Cloning repository inside container...'
   cd /mnt/repositories
