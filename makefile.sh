@@ -7,10 +7,22 @@ AUR_PACKAGES=("wlr-randr" "dnsmasq-git" "libglibutil" "libgbinder" "python-gbind
 PACMAN_CONF_PATH="/etc/aurutils/pacman-x86_64.conf"
 LOGFILE="/var/log/aur_install.log"
 
-# Function to create pacman-x86_64.conf if missing
+# 🔹 Ensure builder user exists
+if ! id "builder" &>/dev/null; then
+    echo "🔹 Creating 'builder' user..."
+    useradd -m -G wheel builder
+    echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
+    echo "✅ 'builder' user created."
+else
+    echo "✅ 'builder' user already exists."
+fi
+
+# 🔹 Ensure pacman-x86_64.conf exists
 fix_pacman_conf() {
     echo "🔹 Creating missing /etc/aurutils/pacman-x86_64.conf..."
-    cat <<EOF > $PACMAN_CONF_PATH
+    mkdir -p /etc/aurutils  # Ensure directory exists
+
+    cat <<EOF > /etc/aurutils/pacman-x86_64.conf
 [options]
 HoldPkg = pacman glibc
 Architecture = auto
@@ -46,10 +58,11 @@ SigLevel = Never
 Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch
 SigLevel = Never
 EOF
+
     echo "✅ Pacman config created."
 }
 
-# Function to install AUR packages using aurutils
+# 🔹 Install AUR packages using aurutils
 install_aur_packages() {
     echo "🚀 Attempting AUR installation using aurutils..."
 
@@ -85,5 +98,5 @@ install_aur_packages() {
     fi
 }
 
-# Run the installation function
+# 🔹 Run Fixes & Install AUR Packages
 install_aur_packages
