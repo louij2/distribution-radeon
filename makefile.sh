@@ -9,24 +9,32 @@ REPO_DIR="/mnt/repositories/distribution-radeon"
 PACMAN_CONF="/etc/pacman.conf"
 STEAMFORK_MIRRORLIST="/etc/pacman.d/steamfork-mirrorlist"
 
-# Refresh Arch mirrors with fastest available
-echo "Refreshing mirror list..."
-reflector --latest 20 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
+# Manually update mirrorlist to avoid slow mirrors
+echo "Updating pacman mirrors..."
+cat > /etc/pacman.d/mirrorlist <<EOF
+Server = https://mirror.osbeck.com/archlinux/\$repo/os/\$arch
+Server = https://mirror.cyberbits.eu/archlinux/\$repo/os/\$arch
+Server = https://archlinux.uk.mirror.allworldit.com/archlinux/\$repo/os/\$arch
+Server = https://mirror.netcologne.de/archlinux/\$repo/os/\$arch
+EOF
 
 # Ensure system is up to date
 echo "Updating system..."
-pacman -Syyu --noconfirm
-pacman -Sy --noconfirm pacman-mirrorlist reflector base-devel git sudo fakeroot archiso
+pacman -Syyu --noconfirm || echo "Ignoring upgrade errors..."
+
+# Install essential dependencies
+echo "Installing essential packages..."
+pacman -Sy --noconfirm base-devel git sudo fakeroot archiso
 
 # Ensure repository directory exists
 mkdir -p "$REPO_DIR"
 
-# Clone the repository if it doesn't exist
+# Clone or update the repository
 if [ ! -d "$REPO_DIR/.git" ]; then
     git clone "$REPO_URL" "$REPO_DIR"
 else
     cd "$REPO_DIR"
-    git config --global --add safe.directory "$REPO_DIR"  # Fix "dubious ownership" error
+    git config --global --add safe.directory "$REPO_DIR"  # Fix "dubious ownership"
     git pull
 fi
 
@@ -44,13 +52,9 @@ if ! grep -q "\[steamfork\]" "$PACMAN_CONF"; then
     echo -e "\n[steamfork]\nInclude = /etc/pacman.d/steamfork-mirrorlist" >> "$PACMAN_CONF"
 fi
 
-# Sync package databases
-echo "Updating pacman..."
+# Sync pacman databases again to include SteamFork repo
+echo "Updating pacman after adding SteamFork repo..."
 pacman -Sy --noconfirm
-
-# Install required dependencies
-echo "Installing dependencies..."
-pacman -S --noconfirm base-devel git sudo fakeroot archiso
 
 # Change directory to repo
 cd "$REPO_DIR"
