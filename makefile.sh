@@ -15,6 +15,12 @@ PACMAN_CONF_DIR="$HOME/.config/pacman"
 # Ensure necessary directories exist
 mkdir -p "$CONTAINER_STORAGE" "$CONTAINER_OUTPUT" "$REPO_DIR" "$PACMAN_CONF_DIR"
 
+# Ensure git is installed before cloning
+if ! command -v git &>/dev/null; then
+    echo "Git is not installed. Installing now..."
+    sudo pacman -Sy --noconfirm git
+fi
+
 # Clone the repo if it doesn't exist
 if [ ! -d "$REPO_DIR/.git" ]; then
     git clone "$REPO_URL" "$REPO_DIR"
@@ -66,15 +72,17 @@ docker run --rm -it --privileged \
   --name "$ARCH_CONTAINER_NAME" "$ARCH_IMAGE" bash -c "
   
   set -e
+  echo 'Updating package database...'
+  pacman -Sy --noconfirm git base-devel sudo fakeroot archiso
+
+  echo 'Cloning repository inside container...'
+  cd /mnt/repositories
+  git clone '$REPO_URL' || (cd distribution-radeon && git pull)
+
   echo 'Setting up pacman...'
   cp /mnt/repositories/distribution-radeon/pacman.conf /etc/pacman.conf
   cp /mnt/repositories/distribution-radeon/steamfork-mirrorlist /etc/pacman.d/steamfork-mirrorlist
-
-  # Update package database
   pacman -Sy --noconfirm
-
-  # Install required dependencies
-  pacman -S --noconfirm base-devel git sudo fakeroot archiso
 
   echo 'Starting build process...'
   cd /mnt/repositories/distribution-radeon
