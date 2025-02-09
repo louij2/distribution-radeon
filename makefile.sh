@@ -1,102 +1,84 @@
 #!/bin/bash
 
-set -e  # Exit on first error
-set -x  # Debugging enabled
+set -e  # Exit immediately on error
+set -x  # Print commands for debugging
 
-AUR_PACKAGES=("wlr-randr" "dnsmasq-git" "libglibutil" "libgbinder" "python-gbinder" "waydroid" "xone-dongle-firmware" "xone-dkms")
-PACMAN_CONF_PATH="/etc/aurutils/pacman-x86_64.conf"
-LOGFILE="/var/log/aur_install.log"
+# Variables
+REPO_URL="https://github.com/louij2/distribution-radeon"
+REPO_DIR="$HOME/Documents/Repositories/distribution-radeon"
+ARCH_CONTAINER_NAME="arch-debug-container"
+ARCH_IMAGE="archlinux:latest"
+CONTAINER_STORAGE="$HOME/Documents/arch-container-storage"
+CONTAINER_OUTPUT="$HOME/Documents/arch-container-output"
+PACMAN_CONF_DIR="$HOME/.config/pacman"
 
-# 🔹 Ensure builder user exists
-if ! id "builder" &>/dev/null; then
-    echo "🔹 Creating 'builder' user..."
-    useradd -m -G wheel builder
-    echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
-    echo "✅ 'builder' user created."
+# Ensure necessary directories exist
+mkdir -p "$CONTAINER_STORAGE" "$CONTAINER_OUTPUT" "$REPO_DIR" "$PACMAN_CONF_DIR"
+
+# Clone the repo if it doesn't exist
+if [ ! -d "$REPO_DIR/.git" ]; then
+    git clone "$REPO_URL" "$REPO_DIR"
 else
-    echo "✅ 'builder' user already exists."
+    cd "$REPO_DIR"
+    git pull
 fi
 
-# 🔹 Ensure pacman-x86_64.conf exists
-fix_pacman_conf() {
-    echo "🔹 Creating missing /etc/aurutils/pacman-x86_64.conf..."
-    mkdir -p /etc/aurutils  # Ensure directory exists
+# Ensure SteamFork repo configuration exists in pacman
+PACMAN_CONF="$PACMAN_CONF_DIR/pacman.conf"
+STEAMFORK_MIRRORLIST="$PACMAN_CONF_DIR/steamfork-mirrorlist"
 
-    cat <<EOF > /etc/aurutils/pacman-x86_64.conf
+cat > "$STEAMFORK_MIRRORLIST" <<EOF
+Server = https://www1.da.steamfork.org/repos/rel
+Server = https://www1.sj.steamfork.org/repos/rel
+Server = https://www1.as.steamfork.org/repos/rel
+Server = https://www1.ny.steamfork.org/repos/rel
+Server = https://www.steamfork.org/repos/rel
+EOF
+
+cat > "$PACMAN_CONF" <<EOF
 [options]
 HoldPkg = pacman glibc
 Architecture = auto
 CheckSpace
-ParallelDownloads = 5
-SigLevel = Required DatabaseOptional
-LocalFileSigLevel = Optional
+SigLevel = Required DatabaseOptional TrustedOnly
+
+[core]
+Include = /etc/pacman.d/mirrorlist
+
+[extra]
+Include = /etc/pacman.d/mirrorlist
+
+[community]
+Include = /etc/pacman.d/mirrorlist
+
+[multilib]
+Include = /etc/pacman.d/mirrorlist
 
 [steamfork]
-Include = /etc/pacman.d/steamfork-mirrorlist
-
-[jupiter-main]
-Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch
-SigLevel = Never
-
-[holo-main]
-Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch
-SigLevel = Never
-
-[core-main]
-Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch
-SigLevel = Never
-
-[extra-main]
-Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch
-SigLevel = Never
-
-[community-main]
-Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch
-SigLevel = Never
-
-[multilib-main]
-Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch
-SigLevel = Never
+Include = $STEAMFORK_MIRRORLIST
 EOF
 
-    echo "✅ Pacman config created."
-}
+# Run the build process inside the Arch container
+docker run --rm -it --privileged \
+  -v "$CONTAINER_STORAGE":/mnt/storage \
+  -v "$CONTAINER_OUTPUT":/mnt/output \
+  -v "$REPO_DIR":/mnt/repositories/distribution-radeon \
+  --name "$ARCH_CONTAINER_NAME" "$ARCH_IMAGE" bash -c "
+  
+  set -e
+  echo 'Setting up pacman...'
+  cp /mnt/repositories/distribution-radeon/pacman.conf /etc/pacman.conf
+  cp /mnt/repositories/distribution-radeon/steamfork-mirrorlist /etc/pacman.d/steamfork-mirrorlist
 
-# 🔹 Install AUR packages using aurutils
-install_aur_packages() {
-    echo "🚀 Attempting AUR installation using aurutils..."
+  # Update package database
+  pacman -Sy --noconfirm
 
-    # First attempt: Normal `aur sync -c`
-    if su builder -c "aur sync -c -n --noview ${AUR_PACKAGES[*]}"; then
-        echo "✅ AUR packages installed successfully!"
-        return 0
-    else
-        echo "⚠️ aur sync -c failed! Checking for missing pacman config..."
-    fi
+  # Install required dependencies
+  pacman -S --noconfirm base-devel git sudo fakeroot archiso
 
-    # Second attempt: Fix missing pacman.conf and retry
-    if [ ! -f "$PACMAN_CONF_PATH" ]; then
-        fix_pacman_conf
-    fi
+  echo 'Starting build process...'
+  cd /mnt/repositories/distribution-radeon
+  make world
+"
 
-    echo "🔄 Retrying AUR installation after fixing pacman.conf..."
-    if su builder -c "aur sync -c -n --noview ${AUR_PACKAGES[*]}"; then
-        echo "✅ AUR packages installed successfully after fixing pacman.conf!"
-        return 0
-    else
-        echo "⚠️ aur sync -c still failed! Trying aur build instead..."
-    fi
-
-    # Final attempt: Switch to `aur build`
-    if su builder -c "aur build -d steamfork ${AUR_PACKAGES[*]}"; then
-        echo "✅ AUR packages installed using aur build!"
-        return 0
-    else
-        echo "❌ All AUR installation methods failed! Logging errors..."
-        echo "AUR installation failed at $(date)" >> $LOGFILE
-        return 1
-    fi
-}
-
-# 🔹 Run Fixes & Install AUR Packages
-install_aur_packages
+echo "Build process completed. Check output in: $CONTAINER_OUTPUT"
