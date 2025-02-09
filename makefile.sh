@@ -24,7 +24,7 @@ pacman -Syyu --noconfirm || echo "Ignoring upgrade errors..."
 
 # Install essential dependencies
 echo "Installing essential packages..."
-pacman -Sy --noconfirm base-devel git sudo fakeroot archiso
+pacman -Sy --noconfirm base-devel git sudo fakeroot archiso gnupg
 
 # Ensure repository directory exists
 mkdir -p "$REPO_DIR"
@@ -38,8 +38,46 @@ else
     git pull
 fi
 
-# Set up SteamFork repository
-echo "Configuring pacman with SteamFork mirrors..."
+# Set up SteamFork repository and required SteamOS repositories
+echo "Configuring pacman with SteamFork and SteamOS repositories..."
+cat > "$PACMAN_CONF" <<EOF
+[options]
+HoldPkg = pacman glibc
+Architecture = auto
+CheckSpace
+ParallelDownloads = 5
+SigLevel = Required DatabaseOptional
+LocalFileSigLevel = Optional
+
+[steamfork]
+Include = /etc/pacman.d/steamfork-mirrorlist
+
+[jupiter-main]
+Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch
+SigLevel = Never
+
+[holo-main]
+Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch
+SigLevel = Never
+
+[core-main]
+Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch
+SigLevel = Never
+
+[extra-main]
+Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch
+SigLevel = Never
+
+[community-main]
+Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch
+SigLevel = Never
+
+[multilib-main]
+Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/\$repo/os/\$arch
+SigLevel = Never
+EOF
+
+# Set up SteamFork mirrorlist
 cat > "$STEAMFORK_MIRRORLIST" <<EOF
 Server = https://www1.da.steamfork.org/repos/rel
 Server = https://www1.sj.steamfork.org/repos/rel
@@ -48,18 +86,20 @@ Server = https://www1.ny.steamfork.org/repos/rel
 Server = https://www.steamfork.org/repos/rel
 EOF
 
-if ! grep -q "\[steamfork\]" "$PACMAN_CONF"; then
-    echo -e "\n[steamfork]\nInclude = /etc/pacman.d/steamfork-mirrorlist" >> "$PACMAN_CONF"
-fi
+# Initialize and refresh PGP keys
+echo "Initializing pacman keyring..."
+pacman-key --init
+pacman-key --populate archlinux
 
-# Import SteamFork PGP keys and trust them
-echo "Importing SteamFork PGP keys..."
-sudo pacman-key --recv-keys A33991EE2981A3B05368EF5E75C1E5647441B94C
-sudo pacman-key --lsign-key A33991EE2981A3B05368EF5E75C1E5647441B94C
-sudo pacman-key --populate
+# Import and trust the SteamFork PGP key
+echo "Importing SteamFork PGP key..."
+pacman-key --recv-keys A33991EE2981A3B05368EF5E75C1E5647441B94C
+echo "Trusting SteamFork PGP key..."
+echo "5" | pacman-key --edit-key A33991EE2981A3B05368EF5E75C1E5647441B94C trust
+pacman-key --lsign-key A33991EE2981A3B05368EF5E75C1E5647441B94C
 
-# Sync pacman databases again to include SteamFork repo
-echo "Updating pacman after adding SteamFork repo..."
+# Sync pacman databases again to include all new repositories
+echo "Updating pacman after adding all repositories..."
 pacman -Sy --noconfirm
 
 # Change directory to repo
